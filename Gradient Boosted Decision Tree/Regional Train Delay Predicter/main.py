@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # ------- Gradient Boosted Decision Tree (GBDT) Catboost. -------
     # Classifier.
     config_gbdt_catboost_classifier = ConfigGBDTCatboostClassifier(
-        iterations = 1200, # At 1793 overfitted.
+        iterations = 2000, 
         learning_rate = 0.15,
         depth = 4,
         verbose = 50,

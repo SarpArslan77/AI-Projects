@@ -2,13 +2,15 @@
 #* model.py
 
 #* ======= Library Imports =======
-# ------- Native Library. -------
+# ------- Native Libraries. -------
 from dataclasses import dataclass
+import os
 
 # ------- Export Libraries. -------
 from catboost import (
     CatBoostClassifier,
-    CatBoostRegressor
+    CatBoostRegressor,
+    Pool
 )
 
 import numpy as np
@@ -80,35 +82,35 @@ class GBDTCatboostClassifier:
             config_gbdt_catboost_classifier: ConfigGBDTCatboostClassifier
     ) -> None:
         # ------- Initializes class attributes from the parameters. -------
-        self.cfg: ConfigGBDTCatboostClassifier = config_gbdt_catboost_classifier
+        self.classifier_cfg: ConfigGBDTCatboostClassifier = config_gbdt_catboost_classifier
 
         # ------- Initializes class attributes dynamically. -------
         #? use_best_model: Ensures the final model uses the best iterations trees.
         #? thread_count = -1: Utilizes all cores on the processor.
         #? border_count: Dictates how many splits are evaluated for numerical features.
         #? rsm (Random Subspace Method): Controls % of features selected at random to evaluate for each split.
-        self.model = CatBoostClassifier(
-            iterations = self.cfg.iterations,
-            learning_rate = self.cfg.learning_rate,
-            depth = self.cfg.depth,
-            verbose = self.cfg.verbose,
-            random_seed = self.cfg.random_seed,
-            l2_leaf_reg = self.cfg.l2_leaf_reg,
+        self.classifier_model = CatBoostClassifier(
+            iterations = self.classifier_cfg.iterations,
+            learning_rate = self.classifier_cfg.learning_rate,
+            depth = self.classifier_cfg.depth,
+            verbose = self.classifier_cfg.verbose,
+            random_seed = self.classifier_cfg.random_seed,
+            l2_leaf_reg = self.classifier_cfg.l2_leaf_reg,
             
-            max_ctr_complexity = self.cfg.max_ctr_complexity,
-            boosting_type = self.cfg.boosting_type,
-            leaf_estimation_method = self.cfg.leaf_estimation_method,
+            max_ctr_complexity = self.classifier_cfg.max_ctr_complexity,
+            boosting_type = self.classifier_cfg.boosting_type,
+            leaf_estimation_method = self.classifier_cfg.leaf_estimation_method,
 
-            train_dir = self.cfg.catboost_info_target_dir,
+            train_dir = self.classifier_cfg.catboost_info_target_dir,
 
-            early_stopping_rounds = self.cfg.early_stopping_rounds,
-            auto_class_weights = self.cfg.auto_class_weights,
+            early_stopping_rounds = self.classifier_cfg.early_stopping_rounds,
+            auto_class_weights = self.classifier_cfg.auto_class_weights,
             #TODO Look for GPU optimization for Intel Iris XE.
             #!task_type = "GPU"
             use_best_model = True,
             thread_count = -1,
             border_count = 64,
-            rsm = 0.8
+            rsm = 0.6
         )
 
         print("-> GBDT Catboost Classifier initialized! ")
@@ -125,17 +127,31 @@ class GBDTCatboostClassifier:
         X_train, y_train = train_data
         X_val, y_val = validate_data
 
+        # ------- Optimizes the datasets for speed. -------
+        # Wraps the datasets in CatBoost Pools.
+        train_pool = Pool(
+            data = X_train,
+            label = y_train,
+            cat_features = self.classifier_cfg.categorical_features
+        )
+        val_pool = Pool(
+            data = X_val,
+            label = y_val,
+            cat_features = self.classifier_cfg.categorical_features
+        )
+
+        # Pre-quantizes features.
+        train_pool.quantize()
+
         # ------- Fits the model with training data. -------
-        self.model.fit(
-            X = X_train,
-            y = y_train,
-            cat_features = self.cfg.categorical_features,
-            eval_set = (X_val, y_val)
+        self.classifier_model.fit(
+            X = train_pool,
+            eval_set = val_pool
         )
 
         print("--- Finished with training the classifier. ---")
 
-        return self.model.get_evals_result()
+        return self.classifier_model.get_evals_result()
 
     def predict(
             self,
@@ -144,10 +160,10 @@ class GBDTCatboostClassifier:
         print(f"--> Performing classifier inference on test samples...")
 
         # ------- Predicts the output based on test data. -------
-        preds: NDArray = self.model.predict(data = X_test)
+        preds: NDArray = self.classifier_model.predict(data = X_test)
 
         # ------- Calculates the prediction probabilities -------
-        pred_probs: NDArray = self.model.predict_proba(X = X_test)
+        pred_probs: NDArray = self.classifier_model.predict_proba(X = X_test)
 
         print("--> Predicted the result and calculated the probabilities.")
 
@@ -176,7 +192,7 @@ class GBDTCatboostClassifier:
 
         # Filters the 'TARGET_LABELS' so the size matches the data.
         present_target_labels: list[str] = [
-            self.cfg.target_labels[i] for i in present_target_class_indices
+            self.classifier_cfg.target_labels[i] for i in present_target_class_indices
         ]
 
         # ------- Creates the classification report. -------
@@ -194,7 +210,7 @@ class GBDTCatboostClassifier:
     
     def save_model(self) -> None:
         # ------- Saves the model. -------
-        self.model.save_model(fname = (Path(self.cfg.catboost_info_target_dir) / self.cfg.model_save_name))
+        self.classifier_model.save_model(fname = (Path(self.classifier_cfg.catboost_info_target_dir) / self.classifier_cfg.model_save_name))
 
         print("-> Succesfully saved the model.")
 
@@ -226,23 +242,24 @@ class GBDTCatboostRegressor:
             config_gbdt_catboost_regressor: ConfigGBDTCatboostRegressor
     ) -> None:
         # ------- Initializes class attributes from parameters. -------
-        self.cfg: ConfigGBDTCatboostRegressor = config_gbdt_catboost_regressor
+        self.regressor_cfg: ConfigGBDTCatboostRegressor = config_gbdt_catboost_regressor
 
         # ------- Initializes class attributes dynamically. -------
-        self.model = CatBoostRegressor(
-            iterations = self.cfg.iterations,
-            learning_rate = self.cfg.learning_rate,
-            depth = self.cfg.depth,
-            loss_function = self.cfg.loss_function,
-            random_seed = self.cfg.random_seed,
-            verbose = self.cfg.verbose,
-            train_dir = self.cfg.catboost_info_target_dir,
-            early_stopping_rounds = self.cfg.early_stopping_rounds,
+        self.regressor_model = CatBoostRegressor(
+            iterations = self.regressor_cfg.iterations,
+            learning_rate = self.regressor_cfg.learning_rate,
+            depth = self.regressor_cfg.depth,
+            loss_function = self.regressor_cfg.loss_function,
+            random_seed = self.regressor_cfg.random_seed,
+            verbose = self.regressor_cfg.verbose,
+            train_dir = self.regressor_cfg.catboost_info_target_dir,
+            early_stopping_rounds = self.regressor_cfg.early_stopping_rounds,
             use_best_model = True,
-            l2_leaf_reg = self.cfg.l2_leaf_reg,
-            thread_count = -1,
+            l2_leaf_reg = self.regressor_cfg.l2_leaf_reg,
+            boosting_type = "Plain",
+            thread_count = os.cpu_count() // 2,
             border_count = 64,
-            rsm = 0.8
+            rsm = 0.6
         )
 
         print("-> GBDT Catboost Regressor initialized! ")
@@ -259,17 +276,31 @@ class GBDTCatboostRegressor:
         X_train, y_train = train_data
         X_val, y_val = validate_data
 
+        # ------- Optimizes the datasets for speed. -------
+        # Wraps the datasets in CatBoost Pools.
+        train_pool = Pool(
+            data = X_train,
+            label = y_train,
+            cat_features = self.regressor_cfg.categorical_features
+        )
+        val_pool = Pool(
+            data = X_val,
+            label = y_val,
+            cat_features = self.regressor_cfg.categorical_features
+        )
+
+        # Pre-quantizes the features.
+        train_pool.quantize()
+
         # ------- Fits the model with training data. -------
-        self.model.fit(
-            X = X_train,
-            y = y_train,
-            cat_features = self.cfg.categorical_features,
-            eval_set = (X_val, y_val) #TODO ?
+        self.regressor_model.fit(
+            X = train_pool,
+            eval_set = val_pool
         )
 
         print("--- Finished with training the regressor. ---")
 
-        return self.model.get_evals_result()
+        return self.regressor_model.get_evals_result()
 
     def predict(
             self,
@@ -278,7 +309,7 @@ class GBDTCatboostRegressor:
         print(f"--> Performing regressor inference on test samples...")
 
         # ------- Predicts the output based on test data. -------
-        preds: NDArray = self.model.predict(data = X_test)
+        preds: NDArray = self.regressor_model.predict(data = X_test)
 
         print("--> Predicted the results.")
 
@@ -319,11 +350,11 @@ class GBDTCatboostRegressor:
         # Applies the interval boundaries. 
         predicted_category_indices: NDArray = np.digitize(
             x = preds,
-            bins = self.cfg.category_limits
+            bins = self.regressor_cfg.category_limits
         )
 
         # Applies the category names.
-        category_names_arr: NDArray = np.array(self.cfg.category_names)
+        category_names_arr: NDArray = np.array(self.regressor_cfg.category_names)
         binned_prediction_categories: NDArray = category_names_arr[predicted_category_indices]
 
         # Repeats the same process for the truth labels.
@@ -332,7 +363,7 @@ class GBDTCatboostRegressor:
 
         actual_category_indices: NDArray = np.digitize(
             x = y_test_flattened,
-            bins = self.cfg.category_limits
+            bins = self.regressor_cfg.category_limits
         )
 
         binned_y_test: NDArray = category_names_arr[actual_category_indices]
@@ -342,7 +373,7 @@ class GBDTCatboostRegressor:
         report_dict: str = classification_report(
             binned_y_test,
             binned_prediction_categories,
-            labels = self.cfg.category_names,
+            labels = self.regressor_cfg.category_names,
             output_dict = True #TODO ET
         )
 
@@ -350,7 +381,7 @@ class GBDTCatboostRegressor:
         cm: NDArray = confusion_matrix(
             binned_y_test,
             binned_prediction_categories,
-            labels = self.cfg.category_names,
+            labels = self.regressor_cfg.category_names,
             normalize = "true"
         )
 
@@ -360,8 +391,9 @@ class GBDTCatboostRegressor:
     
     def save_model(self) -> None:
         # ------- Saves the model. -------
-        model_save_dir: Path = Path(self.cfg.catboost_info_target_dir) / self.cfg.model_save_name
+        model_save_dir: Path = Path(self.regressor_cfg.catboost_info_target_dir) / self.regressor_cfg.model_save_name
 
-        self.model.save_model(fname = model_save_dir)
-    
+        self.regressor_model.save_model(fname = model_save_dir)
+
+        print()
         print("-> Succesfully saved the model.")
