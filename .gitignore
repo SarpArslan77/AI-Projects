@@ -1,8 +1,25 @@
 # Ignore all other project folders
 .cache/
-Convolutional Neural Networks/
-Long-Short Time Memory/
+
+# Convolutional Neural Networks (CNNs).
+Convolutional Neural Networks/PCB Defects
+
+Convolutional Neural Networks/Facial Emotion Recognition/Corrected Dataset
+Convolutional Neural Networks/Facial Emotion Recognition/Empty
+Convolutional Neural Networks/Facial Emotion Recognition/Executable Program
+Convolutional Neural Networks/Facial Emotion Recognition/Old Dataset
+Convolutional Neural Networks/Facial Emotion Recognition/Runs
+
+# Long-Short Time Memory (LSTM).
+Long-Short Time Memory/Battery Health
+Long-Short Time Memory/Mars_Weatherforecast
+Long-Short Time Memory/Trader Bot
+
+Long-Short Time Memory/Distinguisher/Trials
+
+# Reinforcement Learning (RL).
 Reinforcement Learning/
+
 Vibe Coding/
 
 # Standard Python ignores (for inside your tracked folder)
