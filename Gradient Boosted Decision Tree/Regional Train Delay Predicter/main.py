@@ -164,18 +164,18 @@ if __name__ == "__main__":
     # ------- Gradient Boosted Decision Tree (GBDT) Catboost. -------
     # Classifier.
     config_gbdt_catboost_classifier = ConfigGBDTCatboostClassifier(
-        iterations = 2000, 
-        learning_rate = 0.15,
-        depth = 4,
+        iterations = 3000, 
+        learning_rate = 0.05,
+        depth = 8,
         verbose = 50,
-        max_ctr_complexity = 2,
+        max_ctr_complexity = 4,
         boosting_type = "Plain",
         leaf_estimation_method = "Newton",
         catboost_info_target_dir = str(CURRENT_TRAINING_DIR),
-        auto_class_weights = "Balanced",
-        early_stopping_rounds = 50,
+        auto_class_weights = "SqrtBalanced",
+        early_stopping_rounds = 100,
         random_seed = 420,
-        l2_leaf_reg = 7, #? Tested.
+        l2_leaf_reg = 3, 
 
         categorical_features = CATEGORICAL_FEATURES,
         target_labels = ["Active", "Canceled"],
@@ -187,14 +187,14 @@ if __name__ == "__main__":
     # Regressor.
     config_gbdt_catboost_regressor = ConfigGBDTCatboostRegressor(
         iterations = 4000, 
-        learning_rate = 1e-1,
-        depth = 6,
+        learning_rate = 0.05,
+        depth = 8,
         loss_function = "RMSE",
         random_seed = 31,
         verbose = 50,
         catboost_info_target_dir = str(CURRENT_TRAINING_DIR),
         early_stopping_rounds = 100,
-        l2_leaf_reg = 1, #? Tested.
+        l2_leaf_reg = 3, 
 
         categorical_features = CATEGORICAL_FEATURES,
         category_limits = CATEGORY_LIMITS,

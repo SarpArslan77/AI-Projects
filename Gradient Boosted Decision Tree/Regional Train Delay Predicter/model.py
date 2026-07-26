@@ -109,8 +109,8 @@ class GBDTCatboostClassifier:
             #!task_type = "GPU"
             use_best_model = True,
             thread_count = -1,
-            border_count = 64,
-            rsm = 0.6
+            border_count = 128,
+            rsm = 1.0
         )
 
         print("-> GBDT Catboost Classifier initialized! ")
