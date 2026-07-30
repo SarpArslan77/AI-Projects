@@ -103,7 +103,7 @@ if __name__ == "__main__":
         selected_german_state = "North Rhine-Westphalia",
         stations_dir = OTHER_DATA_FILES_PATH,
         stations_json_file_name = "all_stations.json",
-        date_inervall = (datetime(2024, 7, 1, 0, 0, 0), datetime(2026, 7, 30, 23, 59, 59)),
+        date_intervall = (datetime(2024, 7, 1, 0, 0, 0), datetime(2026, 7, 30, 23, 59, 59)),
 
         dataset_csv_files_path = DATASET_CSV_FILES_PATH,
         chunk_size = 1000,

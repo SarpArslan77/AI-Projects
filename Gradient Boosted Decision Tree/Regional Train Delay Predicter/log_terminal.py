@@ -1,4 +1,6 @@
 
+#* terminal_logger.py
+
 #* ======= Library Imports =======
 # ------- Native Libraries. -------
 import sys
@@ -54,6 +56,8 @@ class TerminalLogger:
         self.terminal.write(message)
         # Simultaneously writes to the .txt file.
         self.log_file.write(message)
+
+        self.flush()
 
     def flush(self) -> None:
         """

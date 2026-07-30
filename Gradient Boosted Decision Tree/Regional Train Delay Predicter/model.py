@@ -106,11 +106,11 @@ class GBDTCatboostClassifier:
             early_stopping_rounds = self.classifier_cfg.early_stopping_rounds,
             auto_class_weights = self.classifier_cfg.auto_class_weights,
             #TODO Look for GPU optimization for Intel Iris XE.
-            #!task_type = "GPU"
+            task_type = "GPU",
             use_best_model = True,
             thread_count = -1,
             border_count = 128,
-            rsm = 1.0
+            #!rsm = 1.0
         )
 
         print("-> GBDT Catboost Classifier initialized! ")
@@ -259,7 +259,8 @@ class GBDTCatboostRegressor:
             boosting_type = "Plain",
             thread_count = os.cpu_count() // 2,
             border_count = 64,
-            rsm = 0.6
+            task_type = "GPU"
+            #!rsm = 0.6
         )
 
         print("-> GBDT Catboost Regressor initialized! ")

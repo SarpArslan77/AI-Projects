@@ -23,19 +23,45 @@ import pandas as pd
 from pandas import Timestamp
 from pathlib import Path
 
-#* ======= Config Data Loader Class Initialization =======
 @dataclass(frozen = True)
 class ConfigDataLoader:
+    """
+    Configuration schema for the DataLoader class.
+
+    This dataclass encapsulates dataset sourcing options (online vs. local paths),
+    geographic and temporal filtering criteria for specific German weather stations,
+    and parameters governing preprocessing and chunk-based CSV exportation.
+
+    Attributes:
+        should_download_dataset (bool): Flag determining whether to stream the dataset from Hugging Face or load it locally.
+        hugging_face_dataset_path (str): The repository or path designation of the dataset on the Hugging Face Hub.
+        hugging_face_dataset_data_files (str): File pattern or path arguments for identifying streaming files on Hugging Face.
+        local_dataset_path (str): The directory path used to load the local dataset files.
+        
+        selected_german_state (str): The specific German state name used to filter target weather stations.
+        stations_json_file_name (str): The filename of the JSON document containing state-to-station mappings.
+        stations_dir (Path): The directory path containing the station mappings JSON file.
+        date_intervall (tuple[datetime, datetime]): A datetime range (start, end) used to filter records chronologically.
+        
+        dataset_csv_files_path (Path): The target directory where exported and chunked CSV files are saved or read.
+        chunk_size (int): The maximum buffer limit per year-month grouping before writing rows to disk.
+        to_be_dropped_categorical_features (list[str]): Columns to discard during the export/preprocessing stage.
+        time_categorical_features (list[str]): Timestamp columns to be transformed into cyclical sine and cosine features.
+    """
+
+    # ------- Dataset Source & Path Configuration. -------
     should_download_dataset: bool
     hugging_face_dataset_path: str
     hugging_face_dataset_data_files: str
     local_dataset_path: str
 
-    selected_german_state: str #TODO Make it so, that it is possible to choose multiple states.
-    stations_dir: Path
+    # ------- Filtering & Geographic Configuration. -------
+    selected_german_state: str 
     stations_json_file_name: str
-    date_inervall: tuple[datetime, datetime]
+    stations_dir: Path  
+    date_intervall: tuple[datetime, datetime]
 
+    # ------- Export & Processing Configuration. -------
     dataset_csv_files_path: Path
     chunk_size: int
     to_be_dropped_categorical_features: list[str]
@@ -111,7 +137,7 @@ class DataLoader:
                 x["station_name"] in selected_stations and
                 self.__filter_date(
                     data = x,
-                    date_intervall = self.cfg.date_inervall
+                    date_intervall = self.cfg.date_intervall
                 )
         )
 
@@ -188,6 +214,9 @@ class DataLoader:
             )
 
         # ------- Group rows using a dictionary of buffers. -------
+        #? defaultdict(): Prevents 'KeyError' exceptions when it is tried to acces or modify
+        #   a key that does not yet exist in the dictionary. Instead of raising an error,
+        #   it automatically initializes the missing key with a default value.
         buffers = defaultdict(list)
 
         for row in self.dataset:
