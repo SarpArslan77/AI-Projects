@@ -260,23 +260,28 @@ class DataPreprocessor:
                 indent = 4
             )
 
-    def _split_dataset(
-            self,
+    def _split_datasets(
+            self,    
+            total_rows: int,
             X: DataFrame,
-            y: DataFrame,
-            second_dataframe_size: float,
-            random_state: int
-    ) -> tuple[DataFrame, DataFrame, DataFrame, DataFrame]:
-        # Splits the data into two other datasets based on a percentage.
-        X_first, X_second, y_first, y_second = train_test_split(
-            X,
-            y,
-            test_size = second_dataframe_size,
-            random_state = random_state
-        )
+            y: DataFrame
+    ) -> model_dataset_type:
+        # Chronologically splits the datasets using position indices.
+        train_end_idx = int(total_rows * (1.0 - self.cfg.train_val_and_test_dataset_percentage))
+        val_end_idx: int = train_end_idx + int(total_rows * self.cfg.train_val_and_test_dataset_percentage * (1.0 - self.cfg.validate_and_test_dataset_percentage))
 
-        return (X_first, X_second, y_first, y_second)
+        # Splits the datasets with the calculated indices.
+        X_train: DataFrame = X.iloc[:train_end_idx]
+        y_train: DataFrame = y.iloc[:train_end_idx]
 
+        X_val: DataFrame = X.iloc[train_end_idx:val_end_idx]
+        y_val: DataFrame = y.iloc[train_end_idx:val_end_idx]
+
+        X_test: DataFrame = X.iloc[val_end_idx:]
+        y_test: DataFrame = y.iloc[val_end_idx:]
+
+        return (X_train, y_train, X_val, y_val, X_test, y_test)
+        
     def _fill_missing_values(
             self,
             X: DataFrame
@@ -362,16 +367,30 @@ class DataPreprocessor:
         """
 
         # ------- Seperates the features (X) and target (y), splits the data into training and validation/test sets. -------
+        #? .groupby(""):  Splits a DataFrame into seperate groups based on the values of a specific column.
+        #? .shift(periods = ?): Slides the values of a column down or up by a specified number of rows.
+        # Calculates refence delay and delta target (a.k.a. Differencing).
+        df["prev_delay_in_min"] = df.groupby("train_line_ride_id")["delay_in_min"].shift(periods = 1).fillna(0)
+
+        df["delay_delta"] = df["delay_in_min"] - df["prev_delay_in_min"]
+
+        # Drops high-cardinality IDs and targets.
         X: DataFrame = df.drop(
             columns = [
                 "delay_in_min",
-                "is_canceled"
-            ]
+                "is_canceled",
+                "train_line_ride_id",
+                "delay_delta",
+                "time"
+            ],
+            errors = "ignore"
         )
 
         #? [[ ]]: Passing a list of column mames inside double brackets returns a single-column DataFrame.
         y_classifier: DataFrame = df[["is_canceled"]]
-        y_regressor: DataFrame = df[["delay_in_min"]]
+        y_regressor_delta: DataFrame = df[["delay_delta"]]
+        # Keeps the absolute targets for evaluation.
+        y_regressor_absolute: DataFrame = df[["delay_in_min"]]
 
         # Combines the both target columns, so at the time of split all data stays aligned.
         #? ignore_index: While concatenating horizontally, this parameters removes the column names, IF set to 'True'.
@@ -379,25 +398,20 @@ class DataPreprocessor:
         y_combined: DataFrame = pd.concat(
             [
                 y_classifier,
-                y_regressor
+                y_regressor_delta,
+                y_regressor_absolute
             ],
             ignore_index = False,
             axis = 1
         )
 
         # Splits the data into training, validation and test datasets.
-        X_train, X_val_and_test, y_train, y_val_and_test = self._split_dataset(
-            X = X,
-            y = y_combined,
-            second_dataframe_size = self.cfg.train_val_and_test_dataset_percentage,
-            random_state = self.cfg.train_val_and_test_split_seed
-        )
+        total_rows: int = len(df)
 
-        X_val, X_test, y_val, y_test = self._split_dataset(
-            X = X_val_and_test,
-            y = y_val_and_test,
-            second_dataframe_size = self.cfg.validate_and_test_dataset_percentage,
-            random_state = self.cfg.validate_and_test_split_seed
+        X_train, y_train, X_val, y_val, X_test, y_test = self._split_datasets(
+            total_rows = total_rows,
+            X = X,
+            y = y_combined
         )
 
         # Fills the missing values.
@@ -410,29 +424,40 @@ class DataPreprocessor:
         y_val_classifier: DataFrame = y_val[["is_canceled"]]
         y_test_classifier: DataFrame = y_test[["is_canceled"]]
 
-        y_train_regressor: DataFrame = y_train[["delay_in_min"]]
-        y_val_regressor: DataFrame = y_val[["delay_in_min"]]
-        y_test_regressor: DataFrame = y_test[["delay_in_min"]]
+        y_train_regressor_delta: DataFrame = y_train[["delay_delta"]]
+        y_val_regressor_delta: DataFrame = y_val[["delay_delta"]]
+        y_test_regressor_delta: DataFrame = y_test[["delay_delta"]]
+
+        y_train_regressor_absolute: DataFrame = y_train[["delay_in_min"]]
+        y_val_regressor_absolute: DataFrame = y_val[["delay_in_min"]]
+        y_test_regressor_absolute: DataFrame = y_test[["delay_in_min"]]
 
         # Filters the regressor dataset so, that only non-canceled rows are present.
-        is_not_canceled_indices_train_regressor: DataFrame = (y_train_classifier["is_canceled"] == False) & (y_train_regressor["delay_in_min"].notna())
-        X_train_regressor, y_train_regressor_filtered = self._filter_canceled_rows(
+        is_not_canceled_indices_train_regressor: DataFrame = (y_train_classifier["is_canceled"] == False) & (y_train_regressor_absolute["delay_in_min"].notna())
+        X_train_regressor, y_train_regressor_delta_filtered = self._filter_canceled_rows(
             X = X_train_filled,
-            y = y_train_regressor,
+            y = y_train_regressor_delta,
             is_not_canceled_indices = is_not_canceled_indices_train_regressor
         )
 
-        is_not_canceled_indices_val_regressor: DataFrame = (y_val_classifier["is_canceled"] == False) & (y_val_regressor["delay_in_min"].notna())
-        X_val_regressor, y_val_regressor_filtered = self._filter_canceled_rows(
+        is_not_canceled_indices_val_regressor: DataFrame = (y_val_classifier["is_canceled"] == False) & (y_val_regressor_absolute["delay_in_min"].notna())
+        X_val_regressor, y_val_regressor_delta_filtered = self._filter_canceled_rows(
             X = X_val_filled,
-            y = y_val_regressor,
+            y = y_val_regressor_delta,
             is_not_canceled_indices = is_not_canceled_indices_val_regressor
         )
 
-        is_not_canceled_indices_test_regressor: DataFrame = (y_test_classifier["is_canceled"] == False) & (y_test_regressor["delay_in_min"].notna())
-        X_test_regressor, y_test_regressor_filtered = self._filter_canceled_rows(
+        is_not_canceled_indices_test_regressor: DataFrame = (y_test_classifier["is_canceled"] == False) & (y_test_regressor_absolute["delay_in_min"].notna())
+        X_test_regressor, y_test_regressor_delta_filtered = self._filter_canceled_rows(
             X = X_test_filled,
-            y = y_test_regressor,
+            y = y_test_regressor_delta,
+            is_not_canceled_indices = is_not_canceled_indices_test_regressor
+        )
+
+        # Filters the absolute test targets seperately so evalutions remain absolute minutes.
+        _, y_test_regressor_absolute_filtered = self._filter_canceled_rows(
+            X = X_test_filled,
+            y = y_test_regressor_absolute,
             is_not_canceled_indices = is_not_canceled_indices_test_regressor
         )
 
@@ -441,10 +466,10 @@ class DataPreprocessor:
             X_train_filled, y_train_classifier, X_val_filled, y_val_classifier, X_test_filled, y_test_classifier
         )
         regressor_dataset: model_dataset_type = (
-            X_train_regressor, y_train_regressor_filtered, X_val_regressor, y_val_regressor_filtered, X_test_regressor, y_test_regressor_filtered
+            X_train_regressor, y_train_regressor_delta_filtered, X_val_regressor, y_val_regressor_delta_filtered, X_test_regressor, y_test_regressor_delta_filtered
         )
         extra_dataset: tuple[DataFrame, DataFrame] = (
-            y_test_regressor, y_test_regressor_filtered
+            y_test_regressor_absolute, y_test_regressor_absolute_filtered
         )
 
         # ------- Saves outputs as parquet file. -------

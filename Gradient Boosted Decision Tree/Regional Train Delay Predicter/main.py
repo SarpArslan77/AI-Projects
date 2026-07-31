@@ -46,22 +46,25 @@ if __name__ == "__main__":
     #   f.e. 'main.py' -> '/Users/username/projects/my_app/main.py'.
     #? .parent: Returns the directory containing the current path.
     #   f.e. '/Users/username/projects/my_app/main.py' -> '/Users/username/projects/my_app'
-    MAIN_DIR = Path(__file__).resolve().parent
+    MAIN_PATH = Path(__file__).resolve().parent
 
-    OTHER_DATA_FILES_PATH: Path = MAIN_DIR / "Other Data Files" 
-    DATASET_CSV_FILES_PATH: Path = MAIN_DIR / "Dataset CSV Files" 
+    OTHER_DATA_FILES_PATH: Path = MAIN_PATH / "Other Data Files" 
+    DATASET_CSV_FILES_PATH: Path = MAIN_PATH / "Dataset CSV Files" 
 
     CATEGORICAL_FEATURES: list[str] = [
         "station_name",
         "line_number",
         "final_destination_station",
         "train_type",
-        "train_line_station_num"
+        "train_line_station_num",
+        "train_number"
     ]
 
     TRAINING_DATA_FOLDER_NAME: str = "Training Data"
     CURRENT_TRAINING_FOLDER_NAME = Path(datetime.now().strftime(format = "%Y-%m-%d_%H-%M-%S"))
-    CURRENT_TRAINING_DIR: Path = MAIN_DIR / TRAINING_DATA_FOLDER_NAME / CURRENT_TRAINING_FOLDER_NAME
+    CURRENT_TRAINING_PATH: Path = MAIN_PATH / TRAINING_DATA_FOLDER_NAME / CURRENT_TRAINING_FOLDER_NAME
+
+    CACHE_FILES_PATH: Path = MAIN_PATH / "Cache Files"
 
     CATEGORY_LIMITS: list[int] = [5, 15, 30, 60]
     CATEGORY_NAMES: list[str] = [
@@ -77,13 +80,19 @@ if __name__ == "__main__":
     #? exist_ok: Decides how Python reacts if the folder already exists:
     #   True: Ignores it and proceeds without raising an error.
     #   False: Raises a 'FileExistsError' and stops the execution of the script. 
-    CURRENT_TRAINING_DIR.mkdir(
+    CURRENT_TRAINING_PATH.mkdir(
         parents = True, 
         exist_ok = True
     )
 
+    # Creates the 'Cache Files' folder so Pandas has a valid folder to write to.
+    CACHE_FILES_PATH.mkdir(
+        parents = True,
+        exist_ok = True
+    )
+
     # ------- Terminal Logger (TL). -------
-    terminal_logger = TerminalLogger(file_path = CURRENT_TRAINING_DIR / "terminal_output.txt")
+    terminal_logger = TerminalLogger(file_path = CURRENT_TRAINING_PATH / "terminal_output.txt")
 
     # Stores the original 'stdout' first so we can restore it later if needed.
     original_stdout: TextIO = sys.stdout
@@ -109,10 +118,8 @@ if __name__ == "__main__":
         chunk_size = 1000,
         to_be_dropped_categorical_features = [
             "id",
-            "train_line_ride_id",
             "xml_station_name",
             "eva",
-            "train_number",
             "time",
             "arrival_change_time",
             "departure_change_time"
@@ -131,7 +138,7 @@ if __name__ == "__main__":
     config_data_preprocessor = ConfigDataPreprocessor(
         dataset_csv_files_path = DATASET_CSV_FILES_PATH,
         metadata_file_path = OTHER_DATA_FILES_PATH / "metadata.json",
-        cache_file_path = MAIN_DIR / "Cache Files",
+        cache_file_path = CACHE_FILES_PATH,
 
         train_val_and_test_dataset_percentage = 0.2,
         train_val_and_test_split_seed = 31,
@@ -171,7 +178,7 @@ if __name__ == "__main__":
         max_ctr_complexity = 4,
         boosting_type = "Plain",
         leaf_estimation_method = "Newton",
-        catboost_info_target_dir = str(CURRENT_TRAINING_DIR),
+        catboost_info_target_path = str(CURRENT_TRAINING_PATH),
         auto_class_weights = "SqrtBalanced",
         early_stopping_rounds = 100,
         random_seed = 420,
@@ -192,7 +199,7 @@ if __name__ == "__main__":
         loss_function = "RMSE",
         random_seed = 31,
         verbose = 50,
-        catboost_info_target_dir = str(CURRENT_TRAINING_DIR),
+        catboost_info_target_path = str(CURRENT_TRAINING_PATH),
         early_stopping_rounds = 100,
         l2_leaf_reg = 3, 
 
@@ -210,7 +217,7 @@ if __name__ == "__main__":
         subplots_ncols = 2,
         subplots_figsize = (16, 16),
 
-        current_training_dir = CURRENT_TRAINING_DIR,
+        current_training_path = CURRENT_TRAINING_PATH,
         plot_file_name = "result_plots.png",
 
         cr_annot = True,
@@ -285,11 +292,14 @@ if __name__ == "__main__":
     predicted_running: DataFrame = X_test_filled[is_predicted_running_indices]
 
     # Evaluates the rows, where it is predicted to be not canceled.
-    regressor_predictions = gbdt_catboost_regressor.predict(X_test = predicted_running)
+    regressor_predictions_delta: NDArray = gbdt_catboost_regressor.predict(X_test = predicted_running)
+
+    # Reconstructs absolute delays: Absolute = Reference + Delta.
+    regressor_predictions_absolute: NDArray =  predicted_running["prev_delay_in_min"].values + regressor_predictions_delta
 
     # Converts the continuous predictions into categories.
     regressor_predictions_category_indices: NDArray = np.digitize(
-        x = regressor_predictions,
+        x = regressor_predictions_absolute,
         bins = CATEGORY_LIMITS
     )
 

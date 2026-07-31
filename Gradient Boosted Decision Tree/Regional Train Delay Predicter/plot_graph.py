@@ -50,7 +50,7 @@ class ConfigGraphPlotter:
     subplots_figsize: tuple[int, int]
 
     # ------- File Parameters. -------
-    current_training_dir: Path
+    current_training_path: Path
     plot_file_name: str
 
     # ------- Heatmap Parameters. -------
@@ -290,7 +290,7 @@ class GraphPlotter:
         self.fig.tight_layout()
 
         # Saves the plots.
-        plot_dir: Path = self.cfg.current_training_dir / self.cfg.plot_file_name
+        plot_dir: Path = self.cfg.current_training_path / self.cfg.plot_file_name
 
         plt.savefig(plot_dir)
 

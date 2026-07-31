@@ -64,7 +64,7 @@ class ConfigGBDTCatboostClassifier:
     max_ctr_complexity: int
     boosting_type: str
     leaf_estimation_method: str
-    catboost_info_target_dir: str
+    catboost_info_target_path: str
     auto_class_weights: str
     early_stopping_rounds: int
     random_seed: int
@@ -101,16 +101,14 @@ class GBDTCatboostClassifier:
             boosting_type = self.classifier_cfg.boosting_type,
             leaf_estimation_method = self.classifier_cfg.leaf_estimation_method,
 
-            train_dir = self.classifier_cfg.catboost_info_target_dir,
+            train_dir = self.classifier_cfg.catboost_info_target_path,
 
             early_stopping_rounds = self.classifier_cfg.early_stopping_rounds,
             auto_class_weights = self.classifier_cfg.auto_class_weights,
-            #TODO Look for GPU optimization for Intel Iris XE.
-            task_type = "GPU",
+            #!task_type = "GPU",
             use_best_model = True,
             thread_count = -1,
             border_count = 128,
-            #!rsm = 1.0
         )
 
         print("-> GBDT Catboost Classifier initialized! ")
@@ -210,7 +208,7 @@ class GBDTCatboostClassifier:
     
     def save_model(self) -> None:
         # ------- Saves the model. -------
-        self.classifier_model.save_model(fname = (Path(self.classifier_cfg.catboost_info_target_dir) / self.classifier_cfg.model_save_name))
+        self.classifier_model.save_model(fname = (Path(self.classifier_cfg.catboost_info_target_path) / self.classifier_cfg.model_save_name))
 
         print("-> Succesfully saved the model.")
 
@@ -225,7 +223,7 @@ class ConfigGBDTCatboostRegressor:
     loss_function: str
     random_seed: int
     verbose: int
-    catboost_info_target_dir: str
+    catboost_info_target_path: str
     early_stopping_rounds: int
     l2_leaf_reg: int
 
@@ -252,15 +250,14 @@ class GBDTCatboostRegressor:
             loss_function = self.regressor_cfg.loss_function,
             random_seed = self.regressor_cfg.random_seed,
             verbose = self.regressor_cfg.verbose,
-            train_dir = self.regressor_cfg.catboost_info_target_dir,
+            train_dir = self.regressor_cfg.catboost_info_target_path,
             early_stopping_rounds = self.regressor_cfg.early_stopping_rounds,
             use_best_model = True,
             l2_leaf_reg = self.regressor_cfg.l2_leaf_reg,
             boosting_type = "Plain",
             thread_count = os.cpu_count() // 2,
             border_count = 64,
-            task_type = "GPU"
-            #!rsm = 0.6
+            #!task_type = "GPU"
         )
 
         print("-> GBDT Catboost Regressor initialized! ")
@@ -392,7 +389,7 @@ class GBDTCatboostRegressor:
     
     def save_model(self) -> None:
         # ------- Saves the model. -------
-        model_save_dir: Path = Path(self.regressor_cfg.catboost_info_target_dir) / self.regressor_cfg.model_save_name
+        model_save_dir: Path = Path(self.regressor_cfg.catboost_info_target_path) / self.regressor_cfg.model_save_name
 
         self.regressor_model.save_model(fname = model_save_dir)
 
