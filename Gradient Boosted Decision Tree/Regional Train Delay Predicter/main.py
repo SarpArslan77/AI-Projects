@@ -193,14 +193,14 @@ if __name__ == "__main__":
     # Classifier.
     config_gbdt_catboost_classifier = ConfigGBDTCatboostClassifier(
         iterations = 3000, 
-        learning_rate = 0.05,
+        learning_rate = 0.02,
         depth = 8,
         verbose = 50,
         max_ctr_complexity = 4,
         boosting_type = "Plain",
         leaf_estimation_method = "Newton",
         catboost_info_target_path = str(CURRENT_TRAINING_PATH),
-        auto_class_weights = "SqrtBalanced",
+        auto_class_weights = "Balanced",
         early_stopping_rounds = 100,
         random_seed = 420,
         l2_leaf_reg = 3, 
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     # Regressor.
     config_gbdt_catboost_regressor = ConfigGBDTCatboostRegressor(
         iterations = 4000, 
-        learning_rate = 0.05,
+        learning_rate = 0.02,
         depth = 8,
         loss_function = "RMSE",
         random_seed = 31,
