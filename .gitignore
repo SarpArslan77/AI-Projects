@@ -1,5 +1,6 @@
 # Ignore all other project folders
 .cache/
+.vscode/
 
 # Convolutional Neural Networks (CNNs).
 Convolutional Neural Networks/PCB Defects
@@ -20,6 +21,7 @@ Long-Short Time Memory/Distinguisher/Trials
 # Reinforcement Learning (RL).
 Reinforcement Learning/
 
+# Vibe Coding (VC).
 Vibe Coding/
 
 # Standard Python ignores (for inside your tracked folder)

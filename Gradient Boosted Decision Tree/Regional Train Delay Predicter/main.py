@@ -6,6 +6,7 @@
 from datetime import datetime
 import sys
 from typing import TextIO
+import os
 
 # ------- External Libraries. -------
 import numpy as np
@@ -17,26 +18,31 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
+# Controls whether this file is in a kaggle notebook environment.
+is_running_in_kaggle: bool = "KAGGLE_KERNEL_RUN_TYPE" in os.environ
+
 # ------- Custom Libraries. -------
-from load_data import(
-    ConfigDataLoader,
-    DataLoader
-)
-from plot_graph import (
-    ConfigGraphPlotter,
-    GraphPlotter
-)
-from preprocess_data import(
-    ConfigDataPreprocessor,
-    DataPreprocessor   
-) 
-from model import (
-    ConfigGBDTCatboostClassifier,
-    GBDTCatboostClassifier,
-    ConfigGBDTCatboostRegressor,
-    GBDTCatboostRegressor
-)
-from log_terminal import TerminalLogger
+# IF the file is running in kaggle, all other modular files are already in different cells, so no need to import.
+if not is_running_in_kaggle:
+    from load_data import(
+        ConfigDataLoader,
+        DataLoader
+    )
+    from plot_graph import (
+        ConfigGraphPlotter,
+        GraphPlotter
+    )
+    from preprocess_data import(
+        ConfigDataPreprocessor,
+        DataPreprocessor   
+    ) 
+    from model import (
+        ConfigGBDTCatboostClassifier,
+        GBDTCatboostClassifier,
+        ConfigGBDTCatboostRegressor,
+        GBDTCatboostRegressor
+    )
+    from log_terminal import TerminalLogger
 
 if __name__ == "__main__":
     #* ======= Joint Parameters =======
@@ -46,10 +52,20 @@ if __name__ == "__main__":
     #   f.e. 'main.py' -> '/Users/username/projects/my_app/main.py'.
     #? .parent: Returns the directory containing the current path.
     #   f.e. '/Users/username/projects/my_app/main.py' -> '/Users/username/projects/my_app'
-    MAIN_PATH = Path(__file__).resolve().parent
+    # Initializes them based on whether the file is in a local or kaggle environment.
+    if is_running_in_kaggle:
+        # Sets main path to working directory of kaggle.
+        MAIN_PATH = Path("/kaggle/working")
 
-    OTHER_DATA_FILES_PATH: Path = MAIN_PATH / "Other Data Files" 
-    DATASET_CSV_FILES_PATH: Path = MAIN_PATH / "Dataset CSV Files" 
+        # Sets the other data and csv files into kaggle dataset paths.
+        #! Name of the datasets might be different.
+        OTHER_DATA_FILES_PATH: Path = Path("/kaggle/input/datasets/sarparslan07/regional-train-delay-predicter-other-data-files") 
+        DATASET_CSV_FILES_PATH: Path = Path("/kaggle/input/datasets/sarparslan07/regional-train-delay-predicter-dataset-csv-files")
+    else:
+        MAIN_PATH = Path(__file__).resolve().parent
+
+        OTHER_DATA_FILES_PATH: Path = MAIN_PATH / "Other Data Files" 
+        DATASET_CSV_FILES_PATH: Path = MAIN_PATH / "Dataset CSV Files" 
 
     CATEGORICAL_FEATURES: list[str] = [
         "station_name",
@@ -105,9 +121,6 @@ if __name__ == "__main__":
     # ------- Data Loader (DL). -------
     config_data_loader = ConfigDataLoader(
         should_download_dataset = False,
-        hugging_face_dataset_path = "piebro/deutsche-bahn-data",
-        hugging_face_dataset_data_files = "monthly_processed_data/*.parquet",
-        local_dataset_path = "csv",
 
         selected_german_state = "North Rhine-Westphalia",
         stations_dir = OTHER_DATA_FILES_PATH,
@@ -135,9 +148,17 @@ if __name__ == "__main__":
     )
 
     # ------- Data Preprocesser (DP). -------
+    # Since the input directory in kaggle is read-only, metadata must be written into working directory.
+    METADATA_FILE_NAME: str = "metadata.json"
+
+    if is_running_in_kaggle:
+        METADATA_FILE_PATH: Path = MAIN_PATH / METADATA_FILE_NAME
+    else:
+        METADATA_FILE_PATH: Path = OTHER_DATA_FILES_PATH / METADATA_FILE_NAME
+
     config_data_preprocessor = ConfigDataPreprocessor(
         dataset_csv_files_path = DATASET_CSV_FILES_PATH,
-        metadata_file_path = OTHER_DATA_FILES_PATH / "metadata.json",
+        metadata_file_path = METADATA_FILE_PATH,
         cache_file_path = CACHE_FILES_PATH,
 
         train_val_and_test_dataset_percentage = 0.2,
